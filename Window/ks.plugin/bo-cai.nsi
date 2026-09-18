@@ -9,7 +9,7 @@
 !define TEN_EXE "Ký số plugin.exe"
 !define TEN_EXE_GO "go-cai-dat.exe"
 !define TEN_THU_MUC "KySoPlugin"
-!define NHA_PHAT_HANH "Truong Dai hoc Xay dung Ha Noi"
+!define NHA_PHAT_HANH "Ynap"
 
 !define KHOA_CAU_HINH "Software\KySoPlugin"
 !define GIA_TRI_MOI_TRUONG "MoiTruong"
@@ -53,7 +53,7 @@ BrandingText "${TEN_HIEN} ${PHIEN_BAN}"
 
 VIProductVersion "${PHIEN_BAN_DAY}"
 VIAddVersionKey "ProductName" "${TEN_HIEN}"
-VIAddVersionKey "FileDescription" "Bo cai ${TEN_HIEN}"
+VIAddVersionKey "FileDescription" "Bộ cài ${TEN_HIEN}"
 VIAddVersionKey "FileVersion" "${PHIEN_BAN}"
 VIAddVersionKey "ProductVersion" "${PHIEN_BAN}"
 VIAddVersionKey "CompanyName" "${NHA_PHAT_HANH}"
