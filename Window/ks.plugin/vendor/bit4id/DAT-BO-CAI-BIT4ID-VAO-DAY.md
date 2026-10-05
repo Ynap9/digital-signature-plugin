@@ -24,6 +24,10 @@ khi thì NSIS. Nếu cờ mặc định không đúng, ghi cờ đúng vào `tha
 | InstallShield | `/s /v"/qn"` |
 | Inno Setup | `/VERYSILENT /NORESTART` |
 
+`dong-goi.ps1` lấy **dòng đầu tiên không bắt đầu bằng `#`**; không có file thì dùng cờ mặc định theo đuôi. Với
+`.msi`, cờ đứng sau `msiexec /i "<file>"`; với `.exe`, cờ truyền thẳng cho file đó. Được dùng dấu nháy kép
+(`/s /v"/qn"`), **không** được dùng dấu backtick. File này được git theo dõi, bộ cài thì không.
+
 **Kiểm tra trước khi phát hành**: chạy tay đúng dòng lệnh đó trên một máy sạch, xác nhận không hiện cửa sổ
 nào và cắm token vào thì chứng thư hiện trong `certmgr.msc` → Personal → Certificates.
 

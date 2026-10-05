@@ -2,7 +2,6 @@ using ks.plugin.applications.KySo.Dtos;
 using ks.plugin.applications.KySo.Interfaces;
 using ks.plugin.external.Signing.Dtos;
 using ks.plugin.external.Signing.Interfaces;
-using ks.plugin.shared.Constants;
 using Microsoft.Extensions.Logging;
 
 namespace ks.plugin.applications.KySo.Implements
@@ -18,39 +17,36 @@ namespace ks.plugin.applications.KySo.Implements
             _logger = logger;
         }
 
-        public MoPhienKetQuaDto MoPhien(MoPhienDto input) => _signingSession.MoPhien(input.Thumbprint);
+        public MoPhienKetQuaDto OpenSession(MoPhienDto input) => _signingSession.Open(input.Thumbprint);
 
-        public List<KetQuaKyDto> Ky(KyLoDto input)
+        public List<KetQuaKyDto> Sign(KyLoDto input)
         {
-            _logger.LogInformation("{Method} soYeuCau={SoYeuCau}", nameof(Ky), input.YeuCau.Count);
+            _logger.LogInformation("{Method} requestCount={RequestCount}", nameof(Sign), input.YeuCau.Count);
 
-            var ketQua = new List<KetQuaKyDto>(input.YeuCau.Count);
+            var results = new List<KetQuaKyDto>(input.YeuCau.Count);
 
-            foreach (var yeuCau in input.YeuCau)
+            foreach (var request in input.YeuCau)
             {
                 try
                 {
-                    var chuKy = _signingSession.Ky(Convert.FromBase64String(yeuCau.DuLieuBase64));
-                    ketQua.Add(new KetQuaKyDto
+                    var signature = _signingSession.Sign(Convert.FromBase64String(request.DuLieuBase64));
+                    results.Add(new KetQuaKyDto
                     {
-                        YeuCauId = yeuCau.YeuCauId,
-                        ChuKyBase64 = Convert.ToBase64String(chuKy),
+                        YeuCauId = request.YeuCauId,
+                        ChuKyBase64 = Convert.ToBase64String(signature),
                     });
                 }
                 catch (Exception ex)
                 {
                     // Ghi lý do chứ KHÔNG ghi dữ liệu đem ký: nhật ký của plugin không được chứa nội dung.
-                    _logger.LogWarning(ex, "Ký yêu cầu {YeuCauId} thất bại", yeuCau.YeuCauId);
-                    ketQua.Add(new KetQuaKyDto { YeuCauId = yeuCau.YeuCauId, Loi = ex.Message });
+                    _logger.LogWarning(ex, "Ký yêu cầu {YeuCauId} thất bại", request.YeuCauId);
+                    results.Add(new KetQuaKyDto { YeuCauId = request.YeuCauId, Loi = ex.Message });
                 }
             }
 
-            return ketQua;
+            return results;
         }
 
-        public void DongPhien() => _signingSession.DongPhien();
-
-        public DoTocDoKetQuaDto DoTocDo(DoTocDoDto input) =>
-            _signingSession.DoTocDo(input.Thumbprint, Math.Clamp(input.SoLan, 1, KySoConstants.SoLanDoToiDa));
+        public void CloseSession() => _signingSession.Close();
     }
 }

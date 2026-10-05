@@ -8,6 +8,8 @@ using ks.plugin.external.CauHinh.Implements;
 using ks.plugin.external.CauHinh.Interfaces;
 using ks.plugin.external.Certificates.Implements;
 using ks.plugin.external.Certificates.Interfaces;
+using ks.plugin.external.Logging.Implements;
+using ks.plugin.external.Logging.Interfaces;
 using ks.plugin.external.Signing.Implements;
 using ks.plugin.external.Signing.Interfaces;
 using ks.plugin.external.Tray.Implements;
@@ -15,7 +17,6 @@ using ks.plugin.external.Tray.Interfaces;
 using ks.plugin.shared.Constants;
 using System.Drawing;
 using System.Reflection;
-using System.Text;
 using System.Windows.Forms;
 
 namespace ks.plugin.api
@@ -25,29 +26,40 @@ namespace ks.plugin.api
         [STAThread]
         private static void Main(string[] args)
         {
-            // Cửa sổ console mặc định dùng bảng mã cũ, tiếng Việt ra dấu hỏi. Đặt trước mọi dòng in ra.
-            Console.OutputEncoding = Encoding.UTF8;
+            using IMotBanChay singleInstance = new MotBanChay();
 
-            using IMotBanChay motBanChay = new MotBanChay();
-            ICuaSoConsole cuaSoConsole = new CuaSoConsole();
-
-            if (!motBanChay.GiuCho())
+            if (!singleInstance.GiuCho())
             {
-                motBanChay.GoiBanDangChay();
+                singleInstance.GoiBanDangChay();
                 return;
             }
 
-            cuaSoConsole.GoNutDong();
-            cuaSoConsole.An();
-            motBanChay.LangNgheYeuCauMo(cuaSoConsole.Hien);
+            // Must run before any window is created.
+            Application.SetHighDpiMode(HighDpiMode.SystemAware);
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
 
-            ICauHinhCaiDat cauHinhCaiDat = new CauHinhCaiDat();
+            var iconBytes = ReadIcon();
+            using var appIcon = new Icon(new MemoryStream(iconBytes));
+            using var trayIcon = new Icon(new MemoryStream(iconBytes), SystemInformation.SmallIconSize);
+
+            ILogBuffer logBuffer = new LogBuffer();
+
+            ICauHinhCaiDat installConfig = new CauHinhCaiDat();
 
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
                 Args = args,
-                EnvironmentName = cauHinhCaiDat.DocMoiTruong()
+                EnvironmentName = installConfig.DocMoiTruong()
             });
+
+            // Default providers include the Windows Event Log, which would persist thumbprints and failures to disk.
+            builder.Logging.ClearProviders();
+            builder.Logging.AddProvider(new LogBufferProvider(logBuffer));
+            // The release ships without appsettings.json, so its log levels must be set in code.
+            builder.Logging.AddFilter<LogBufferProvider>("Microsoft.AspNetCore", LogLevel.Warning);
+            // Its startup lines ("Press Ctrl+C to shut down") assume a console; the status cards show the same facts.
+            builder.Logging.AddFilter<LogBufferProvider>("Microsoft.Hosting.Lifetime", LogLevel.Warning);
 
             // Chỉ nghe trên loopback: plugin phục vụ đúng trình duyệt của máy này, không lộ ra mạng LAN.
             builder.WebHost.ConfigureKestrel(options =>
@@ -89,17 +101,39 @@ namespace ks.plugin.api
             app.UseCors();
             app.MapControllers();
 
-            app.Logger.LogInformation("{Ten} {PhienBan} đang nghe tại http://127.0.0.1:{Port}",
+            app.Logger.LogInformation("{Name} {Version} đang nghe tại http://127.0.0.1:{Port}",
                 PluginConstants.Ten, PluginConstants.PhienBan, PluginConstants.Port);
 
-            app.Start();
+            try
+            {
+                app.Start();
+            }
+            catch (Exception ex)
+            {
+                // No console any more: without this dialog a startup failure (e.g. port taken) is silent.
+                MessageBox.Show(
+                    $"Không khởi động được {PluginConstants.Ten} trên cổng {PluginConstants.Port}.\n\n{ex.Message}",
+                    PluginConstants.Ten, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
 
-            using var luongBieuTuong = Assembly.GetExecutingAssembly()
+            // Created only after the host has started: a WinForms control installs a sync context on this thread,
+            // and the blocking Start() above must not run under it.
+            using var statusWindow = new StatusWindow(appIcon, logBuffer);
+            statusWindow.SetEnvironment(builder.Environment.EnvironmentName);
+            singleInstance.LangNgheYeuCauMo(statusWindow.ShowWindow);
+
+            IKhayHeThong tray = new KhayHeThong(statusWindow);
+            tray.Run(trayIcon, () => app.StopAsync().GetAwaiter().GetResult());
+        }
+
+        private static byte[] ReadIcon()
+        {
+            using var stream = Assembly.GetExecutingAssembly()
                 .GetManifestResourceStream(PluginConstants.TaiNguyenBieuTuong)!;
-            using var bieuTuong = new Icon(luongBieuTuong, SystemInformation.SmallIconSize);
-
-            IKhayHeThong khayHeThong = new KhayHeThong(cuaSoConsole);
-            khayHeThong.Chay(bieuTuong, () => app.StopAsync().GetAwaiter().GetResult());
+            using var buffer = new MemoryStream();
+            stream.CopyTo(buffer);
+            return buffer.ToArray();
         }
     }
 }

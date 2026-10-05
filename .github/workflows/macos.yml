@@ -1,0 +1,50 @@
+name: macOS plugin
+
+on:
+  push:
+    paths:
+      - "MacOS/ks-plugin/**"
+      - ".github/workflows/macos.yml"
+  pull_request:
+    paths:
+      - "MacOS/ks-plugin/**"
+      - ".github/workflows/macos.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    working-directory: MacOS/ks-plugin
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install pinned toolchain
+        run: rustup toolchain install
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Build Apple Silicon
+        run: cargo build --workspace --release --target aarch64-apple-darwin
+
+      - name: Build Intel
+        run: cargo build --workspace --release --target x86_64-apple-darwin

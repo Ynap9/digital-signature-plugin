@@ -94,16 +94,14 @@ namespace ks.plugin.external.Certificates.Implements
                 using var rsa = cert.GetRSAPrivateKey();
                 if (rsa != null)
                 {
-                    dto.OnUsbToken = rsa is RSACng rsaCng
-                        && IsHardwareProvider(rsaCng.Key.Provider?.Provider);
+                    dto.OnUsbToken = KeyProviders.IsHardwareProvider(KeyProviders.GetProviderName(rsa));
                     rsa.SignData(probe, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
                 }
                 else
                 {
                     using var ecdsa = cert.GetECDsaPrivateKey()
                         ?? throw new InvalidOperationException("Chứng thư số không dùng thuật toán RSA hoặc ECDSA.");
-                    dto.OnUsbToken = ecdsa is ECDsaCng ecdsaCng
-                        && IsHardwareProvider(ecdsaCng.Key.Provider?.Provider);
+                    dto.OnUsbToken = KeyProviders.IsHardwareProvider(KeyProviders.GetProviderName(ecdsa));
                     ecdsa.SignData(probe, HashAlgorithmName.SHA256);
                 }
             }
@@ -122,16 +120,6 @@ namespace ks.plugin.external.Certificates.Implements
 
             dto.Valid = true;
             return dto;
-        }
-
-        /// <summary>Tên provider có phải của thiết bị phần cứng hay không, dò theo cùng bộ dấu hiệu với lúc liệt kê.</summary>
-        public static bool IsHardwareProvider(string? keyProvider)
-        {
-            return !string.IsNullOrWhiteSpace(keyProvider)
-                && !ChungThuSoConstants.SoftwareKeyProviderMarkers.Any(marker =>
-                    keyProvider.Contains(marker, StringComparison.OrdinalIgnoreCase))
-                && ChungThuSoConstants.HardwareKeyProviderMarkers.Any(marker =>
-                    keyProvider.Contains(marker, StringComparison.OrdinalIgnoreCase));
         }
     }
 }

@@ -7,40 +7,37 @@ namespace ks.plugin.external.Tray.Implements
 {
     public class KhayHeThong : IKhayHeThong
     {
-        private readonly ICuaSoConsole _cuaSoConsole;
+        private readonly IStatusWindow _statusWindow;
 
-        public KhayHeThong(ICuaSoConsole cuaSoConsole)
+        public KhayHeThong(IStatusWindow statusWindow)
         {
-            _cuaSoConsole = cuaSoConsole;
+            _statusWindow = statusWindow;
         }
 
-        public void Chay(Icon bieuTuong, Action khiThoat)
+        public void Run(Icon icon, Action onExit)
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-
             using var menu = new ContextMenuStrip();
-            using var bieuTuongKhay = new NotifyIcon
+            using var trayIcon = new NotifyIcon
             {
-                Icon = bieuTuong,
+                Icon = icon,
                 Text = $"{PluginConstants.Ten} {PluginConstants.PhienBan}",
                 ContextMenuStrip = menu,
                 Visible = true,
             };
 
-            menu.Items.Add("Mở", null, (_, _) => _cuaSoConsole.Hien());
+            menu.Items.Add("Mở", null, (_, _) => _statusWindow.ShowWindow());
             menu.Items.Add("Thoát", null, (_, _) =>
             {
-                bieuTuongKhay.Visible = false;
-                khiThoat();
+                trayIcon.Visible = false;
+                onExit();
                 Application.ExitThread();
             });
 
-            bieuTuongKhay.MouseClick += (_, doiSo) =>
+            trayIcon.MouseClick += (_, args) =>
             {
-                if (doiSo.Button == MouseButtons.Left)
+                if (args.Button == MouseButtons.Left)
                 {
-                    _cuaSoConsole.Hien();
+                    _statusWindow.ShowWindow();
                 }
             };
 

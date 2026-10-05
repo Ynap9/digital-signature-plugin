@@ -1,0 +1,2 @@
+﻿# co chay ngam cho VGCA Token Manager (NSIS)
+/S

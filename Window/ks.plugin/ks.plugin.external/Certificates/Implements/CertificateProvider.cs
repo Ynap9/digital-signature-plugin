@@ -1,8 +1,6 @@
 using ks.plugin.external.Certificates.Dtos;
 using ks.plugin.external.Certificates.Interfaces;
-using ks.plugin.shared.Constants;
 using Microsoft.Extensions.Logging;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 namespace ks.plugin.external.Certificates.Implements
@@ -52,42 +50,8 @@ namespace ks.plugin.external.Certificates.Implements
 
                 foreach (var cert in certs)
                 {
-                    string? keyProvider = null;
-                    if (cert.HasPrivateKey)
-                    {
-                        try
-                        {
-                            using var rsa = cert.GetRSAPrivateKey();
-                            if (rsa is RSACng rsaCng)
-                            {
-                                keyProvider = rsaCng.Key.Provider?.Provider;
-                            }
-#pragma warning disable SYSLIB0028 // CAPI đời cũ: một số middleware token đăng ký khoá qua CSP, không phải KSP.
-                            else if (rsa is RSACryptoServiceProvider rsaCapi)
-                            {
-                                keyProvider = rsaCapi.CspKeyContainerInfo.ProviderName;
-                            }
-#pragma warning restore SYSLIB0028
-                            else
-                            {
-                                using var ecdsa = cert.GetECDsaPrivateKey();
-                                if (ecdsa is ECDsaCng ecdsaCng)
-                                {
-                                    keyProvider = ecdsaCng.Key.Provider?.Provider;
-                                }
-                            }
-                        }
-                        catch
-                        {
-                            keyProvider = null;
-                        }
-                    }
-
-                    var isHardwareKey = !string.IsNullOrWhiteSpace(keyProvider)
-                        && !ChungThuSoConstants.SoftwareKeyProviderMarkers.Any(marker =>
-                            keyProvider.Contains(marker, StringComparison.OrdinalIgnoreCase))
-                        && ChungThuSoConstants.HardwareKeyProviderMarkers.Any(marker =>
-                            keyProvider.Contains(marker, StringComparison.OrdinalIgnoreCase));
+                    var keyProvider = KeyProviders.GetProviderName(cert);
+                    var isHardwareKey = KeyProviders.IsHardwareProvider(keyProvider);
 
                     var keyUsage = cert.Extensions.OfType<X509KeyUsageExtension>().FirstOrDefault();
                     var allowsSigning = keyUsage == null

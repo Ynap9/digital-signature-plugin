@@ -27,7 +27,6 @@ namespace ks.plugin.external.Tray.Implements
             {
                 return;
             }
-
             using (tinHieu)
             {
                 tinHieu.Set();

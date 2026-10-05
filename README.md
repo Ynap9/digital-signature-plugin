@@ -45,6 +45,8 @@ Hai bản là hai ứng dụng riêng, khác cả ngôn ngữ, không dùng chun
 điều hành nên không che được bằng một lớp trừu tượng. Thứ giữ cho chúng thay thế được nhau là [API](#api),
 không phải mã nguồn — bên gọi không cần biết máy người dùng chạy hệ điều hành nào.
 
+Tài liệu chi tiết từng bản: [`Window/docs`](Window/docs/README.md) · [`MacOS/docs`](MacOS/docs/README.md).
+
 ## Yêu cầu
 
 Để chạy plugin:
@@ -56,7 +58,8 @@ Middleware là bắt buộc, không phải tuỳ chọn. Nó đăng ký một pr
 trên token hiện ra trong kho chứng thư của Windows như chứng thư thường. Plugin đọc kho đó chứ không nạp thư
 viện PKCS#11 nào. Máy chưa cài middleware thì plugin chạy được nhưng không thấy token.
 
-Bộ cài mang sẵn middleware và tự cài nếu máy chưa có, nên thông thường không phải làm gì thêm.
+Bộ cài mang sẵn middleware cho cả hai đời token của Ban Cơ yếu — **bit4id** (token mới) và **TokenManager**
+(token trước 2022) — và tự cài cái nào máy còn thiếu, nên thông thường không phải làm gì thêm.
 
 Để build từ mã nguồn, xem [Build từ mã nguồn](#build-từ-mã-nguồn).
 
@@ -83,7 +86,9 @@ phần mềm dùng chung cho mọi ứng dụng chữ ký số trên máy.
 
 ## Sử dụng
 
-Sau khi cài, plugin chạy nền ở khay hệ thống và tự khởi động cùng Windows. Chỉ một bản chạy tại một thời điểm.
+Sau khi cài, plugin chạy nền ở khay hệ thống và tự khởi động cùng Windows, không bật cửa sổ nào. Bấm icon ở khay
+(hoặc mở lại exe) để xem cửa sổ trạng thái: phiên bản, địa chỉ nghe và nhật ký như console. Đóng cửa sổ chỉ ẩn
+nó xuống khay; muốn tắt plugin thì chọn **Thoát** ở menu khay. Chỉ một bản chạy tại một thời điểm.
 
 Kiểm tra plugin đang chạy:
 
@@ -92,7 +97,7 @@ curl http://127.0.0.1:17739/api/plugin/trang-thai
 ```
 
 ```jsonc
-{ "status": 1, "data": { "phienBan": "2.0.0" }, "code": 200, "message": "Ok" }
+{ "status": 1, "data": { "phienBan": "3.0.0" }, "code": 200, "message": "Ok" }
 ```
 
 Liệt kê chứng thư, kể cả chứng thư không ký được:
@@ -121,13 +126,12 @@ Mọi phản hồi dùng chung một envelope:
 | POST | `api/plugin/chung-thu-so/kiem-tra-token` | Ký thử một mẩu dữ liệu để xác nhận token dùng được |
 | POST | `api/plugin/ky-so/mo-phien` | Mở khoá trên token và giữ handle cho cả lô; trả chứng thư phần công khai |
 | POST | `api/plugin/ky-so/ky` | Ký cả một đợt yêu cầu bằng handle đã mở, không hỏi PIN lại |
-| POST | `api/plugin/ky-so/do-toc-do` | Đo thời gian một lượt ký thật trên token |
 | POST | `api/plugin/ky-so/dong-phien` | Đóng phiên, giải phóng handle khoá |
 
 Ba điểm về hành vi cần biết trước khi tích hợp:
 
 - **Liệt kê chứng thư không bao giờ hỏi mã PIN.** Nó chỉ đọc metadata của khoá.
-- **Ba route chạm vào khoá bí mật thì bật hộp PIN**: `kiem-tra-token`, `ky-so/mo-phien` và `ky-so/do-toc-do`.
+- **Hai route chạm vào khoá bí mật thì bật hộp PIN**: `kiem-tra-token` và `ky-so/mo-phien`.
   Đó cũng là bằng chứng duy nhất rằng token đang cắm thật — mọi phép đọc metadata đều có thể "đạt hết" trong
   khi token đã rút từ lâu.
 - **Kết quả liệt kê không có cờ tin cậy.** Máy người dùng không kiểm soát được nên cờ do nó gửi lên là vô giá
@@ -154,6 +158,11 @@ giao diện vẫn báo chưa cài thì kiểm CORS trước tiên.
 **Đối chiếu phiên bản.** `trang-thai` trả chuỗi phiên bản đọc từ assembly. Phía máy chủ tự quyết định chấp nhận
 những phiên bản nào; nâng phiên bản plugin thì phải cập nhật danh sách chấp nhận ở **mọi** hệ thống đang dùng,
 thiếu một bên là bên đó báo plugin lỗi thời ngay sau khi người dùng cập nhật.
+
+Phiên bản theo **SemVer** `MAJOR.MINOR.PATCH`: đổi hợp đồng API theo kiểu phá tương thích (bỏ route, đổi
+trường) ⇒ tăng MAJOR; thêm tính năng không phá ⇒ MINOR; chỉ sửa lỗi ⇒ PATCH. `3.0.0` (2026-10-05) tăng MAJOR
+vì bỏ route `ky-so/do-toc-do`. File exe mang thêm số hiệu bốn phần của Windows (`3.0.0.0`, phần cuối là BUILD);
+`trang-thai` chỉ trả ba phần SemVer.
 
 ## Cấu hình
 
@@ -185,7 +194,7 @@ Bốn project, chia tầng như một ứng dụng web thường:
 ```
 ks.plugin.api            Controller, Program.cs (dựng web host, cấu hình CORS)
 ks.plugin.applications   Nghiệp vụ mỏng: đọc chứng thư, ký số
-ks.plugin.external       Chứng thư, phiên ký, khay hệ thống, đọc cấu hình đã cài
+ks.plugin.external       Chứng thư, phiên ký, khay hệ thống + cửa sổ trạng thái, nhật ký, đọc cấu hình đã cài
 ks.plugin.shared         Hằng số, envelope ApiResponse
 ```
 
@@ -207,7 +216,8 @@ Script publish plugin self-contained (máy người dùng không cần .NET runt
 file thực thi duy nhất, kết quả vào `bo-cai/`.
 
 Middleware của hãng token là phần mềm bên thứ ba, không nằm trong mã nguồn. Đặt file cài vào `vendor/bit4id/`
-để bộ cài mang kèm; không có file thì vẫn đóng gói được, chỉ là bản ra không tự cài middleware.
+và `vendor/vgca-tokenmanager/` để bộ cài mang kèm; thiếu file nào thì vẫn đóng gói được, chỉ là bản ra không
+tự cài middleware đó.
 
 ## Bảo mật
 
@@ -245,11 +255,8 @@ nối ra ngoài là chân dung mã độc điển hình. Trên macOS thì đây 
 máy chủ qua WebSocket để nhận việc, không mở cổng nào cả: như vậy không trang web nào gọi được plugin, hết
 chuyện mixed content, hết Private Network Access, hết xung đột cổng.
 
-**Giám sát rút token.** Phiên ký tự đóng sau 15 phút không dùng, nhưng chưa đóng ngay khi rút token — rút giữa
-lô hiện biểu hiện thành một loạt file lỗi thay vì một thông báo rõ ràng.
-
-**Hộp PIN hiện chìm.** Plugin chạy nền không sở hữu cửa sổ nào nên hộp PIN có thể nằm sau trình duyệt. Hướng
-xử lý là cho plugin chạy dạng tray app có cửa sổ ẩn rồi truyền handle cửa sổ đó vào thuộc tính CNG
+**Hộp PIN hiện chìm.** Hộp PIN có thể nằm sau trình duyệt vì không gắn với cửa sổ nào. Plugin nay đã có cửa sổ
+trạng thái (ẩn khi chạy nền, luôn có handle); việc còn lại là truyền handle đó vào thuộc tính CNG
 `"HWND Handle"` trước khi ký.
 
 ## Đóng góp

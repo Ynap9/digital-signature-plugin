@@ -2,12 +2,20 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0-windows</TargetFramework>
+    <!-- WinExe: no console window; on Windows 11 the console opens in Windows Terminal, which ShowWindow cannot hide. -->
+    <OutputType>WinExe</OutputType>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>Ký số plugin</AssemblyName>
     <!-- Nguồn DUY NHẤT của phiên bản: PluginConstants.PhienBan đọc lại từ assembly, BE đối chiếu chuỗi đó
          với whitelist Plugin:PhienBanPhuHop. -->
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
+    <!-- SemVer MAJOR.MINOR.PATCH for the product/API; Windows file version adds a fourth BUILD field. -->
+    <FileVersion>$(Version).0</FileVersion>
+    <AssemblyVersion>$(Version).0</AssemblyVersion>
+    <Product>Plugin ký số</Product>
+    <Company>YnaP</Company>
+    <Copyright>© 2026 YnaP</Copyright>
     <RootNamespace>ks.plugin.api</RootNamespace>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>Assets\ky-so.ico</ApplicationIcon>

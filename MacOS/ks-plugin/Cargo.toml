@@ -1,0 +1,78 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/ks-plugin-shared",
+    "crates/ks-plugin-external",
+    "crates/ks-plugin-applications",
+    "crates/ks-plugin-api",
+    "app",
+    "tools/ks-probe",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+authors = ["Ynap"]
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+ks-plugin-shared = { path = "crates/ks-plugin-shared" }
+ks-plugin-external = { path = "crates/ks-plugin-external" }
+ks-plugin-applications = { path = "crates/ks-plugin-applications" }
+ks-plugin-api = { path = "crates/ks-plugin-api" }
+
+pcsc = "2.9.0"
+nusb = "0.2.7"
+
+rsa = "0.9.10"
+sha2 = { version = "0.10.9", features = ["oid"] }
+sha1 = "0.10"
+x509-cert = "0.2.5"
+der = "0.7"
+spki = "0.7"
+zeroize = "1.9"
+
+axum = "0.8.9"
+tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "sync", "net", "signal"] }
+tower-http = { version = "0.7.1", features = ["cors", "limit", "trace"] }
+
+axum-server = { version = "0.8.0", features = ["tls-rustls"] }
+rustls = "0.23"
+rcgen = "0.14.10"
+
+tao = "0.37"
+tray-icon = "0.25.1"
+objc2 = "0.6"
+objc2-app-kit = "0.3.2"
+security-framework = "3.7.0"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_repr = "0.1"
+base64 = "0.23"
+hex = "0.4"
+chrono = "0.4"
+
+thiserror = "2.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+
+flate2 = "1.1"
+rpassword = "7.5.4"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+dbg_macro = "deny"
+todo = "deny"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

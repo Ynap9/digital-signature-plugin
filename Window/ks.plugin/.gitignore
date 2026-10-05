@@ -33,6 +33,10 @@ logs/
 
 vendor/bit4id/*
 !vendor/bit4id/*.md
+!vendor/bit4id/tham-so.txt
+vendor/vgca-tokenmanager/*
+!vendor/vgca-tokenmanager/*.md
+!vendor/vgca-tokenmanager/tham-so.txt
 *.zip
 
 TestResults/

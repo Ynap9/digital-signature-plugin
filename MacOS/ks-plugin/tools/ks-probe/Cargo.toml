@@ -1,0 +1,17 @@
+[package]
+name = "ks-probe"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ks-plugin-external.workspace = true
+hex.workspace = true
+rpassword.workspace = true
+zeroize.workspace = true
+
+[lints]
+workspace = true

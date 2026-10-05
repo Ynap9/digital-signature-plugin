@@ -10,7 +10,7 @@ namespace ks.plugin.applications.KySo.Interfaces
     public interface IKySoService
     {
         /// <summary>Mở phiên ký - chỗ duy nhất hộp PIN bật lên. Trả chứng thư phần công khai cho máy chủ.</summary>
-        MoPhienKetQuaDto MoPhien(MoPhienDto input);
+        MoPhienKetQuaDto OpenSession(MoPhienDto input);
 
         /// <summary>
         /// Ký cả một lô yêu cầu trong MỘT lời gọi. Gom theo lô vì token ký tuần tự: nếu mỗi chữ ký một vòng
@@ -18,12 +18,9 @@ namespace ks.plugin.applications.KySo.Interfaces
         ///
         /// Một yêu cầu hỏng không làm hỏng cả lô - trả lỗi riêng cho yêu cầu đó rồi ký tiếp.
         /// </summary>
-        List<KetQuaKyDto> Ky(KyLoDto input);
+        List<KetQuaKyDto> Sign(KyLoDto input);
 
         /// <summary>Đóng phiên, giải phóng handle khoá.</summary>
-        void DongPhien();
-
-        /// <summary>Đo thời gian một lượt ký thật trên token, để biết sàn cứng trước khi bàn tối ưu.</summary>
-        DoTocDoKetQuaDto DoTocDo(DoTocDoDto input);
+        void CloseSession();
     }
 }

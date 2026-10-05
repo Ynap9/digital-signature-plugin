@@ -4,6 +4,6 @@ namespace ks.plugin.external.Tray.Interfaces
 {
     public interface IKhayHeThong
     {
-        void Chay(Icon bieuTuong, Action khiThoat);
+        void Run(Icon icon, Action onExit);
     }
 }

@@ -5,6 +5,8 @@ Bản macOS của plugin ký số, viết bằng Rust. Đang phát triển, chư
 Tài liệu này ghi lại hướng làm và những gì đã biết, để khi bắt tay vào viết không phải dò lại. Hợp đồng API mà
 bản này phải thoả nằm ở [README tổng](../README.md) — đọc trước.
 
+Khảo sát đầy đủ (token VGCA, “Ký số đa năng”, khả thi Rust, phương án): [docs/](docs/README.md).
+
 ## Mục lục
 
 - [Trạng thái](#trạng-thái)

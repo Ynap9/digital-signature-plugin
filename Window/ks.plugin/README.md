@@ -3,6 +3,8 @@
 Bản Windows của plugin ký số, viết bằng .NET 9. Ứng dụng chạy trên **máy người dùng**, làm cầu nối giữa trang
 web ký số và USB token. Đọc [README tổng](../../README.md) để nắm bối cảnh trước.
 
+Hợp đồng API, luồng ký và thiết kế bảo mật: [../docs/](../docs/README.md).
+
 .NET 9 cho Windows, phát hành thành **một file `.exe` là trình cài đặt NSIS có wizard**, mang sẵn bản plugin
 self-contained bên trong: máy người dùng không cần .NET runtime, không phải giải nén, không có file phụ nào
 để chạy nhầm.
@@ -35,12 +37,27 @@ Bốn project, cùng cách chia tầng với backend:
 ```
 ks.plugin.api            Controller, Program.cs (dựng web host + cấu hình CORS)
 ks.plugin.applications   Nghiệp vụ mỏng: đọc chứng thư, ký số
-ks.plugin.external       Đọc chứng thư, kiểm tra token, khay hệ thống, đọc cấu hình đã cài
+ks.plugin.external       Đọc chứng thư, kiểm tra token, khay hệ thống + cửa sổ trạng thái, nhật ký, đọc cấu hình
 ks.plugin.shared         Hằng số, envelope ApiResponse
 ```
 
 `Ký số plugin.exe` chỉ còn **một vai — plugin**. Việc cài đặt do trình cài đặt NSIS (`bo-cai.nsi`) lo trọn:
 chép file, bật tự khởi động, ghi mục gỡ cài đặt, cài middleware. Plugin không tự cài chính nó nữa.
+
+Exe build dạng **`WinExe`**, không có console: trên Windows 11 console mở trong Windows Terminal và `ShowWindow`
+không ẩn được tab đó, nên bản console cũ bật cửa sổ đen mỗi lần khởi động máy. Thay vào đó là `StatusWindow`
+(`external/Tray`) — form WinForms nhẹ hiện phiên bản, địa chỉ nghe và nhật ký. Nhật ký đi qua `LogBufferProvider`
+vào `LogBuffer` (`external/Logging`): chỉ giữ 1000 dòng cuối **trong RAM**, không ghi xuống đĩa. Bản phát hành
+không kèm `appsettings.json` nên mức log đặt bằng code trong `Program.cs`: `Microsoft.AspNetCore` và
+`Microsoft.Hosting.Lifetime` chỉ từ `Warning` (dòng *Press Ctrl+C* của Lifetime vô nghĩa khi không có console).
+
+Phiên bản, nhà phát hành `YnaP` và copyright cùng khai ở `ks.plugin.api.csproj` (`<Version>`, `<Company>`,
+`<Copyright>`); cửa sổ đọc lại copyright từ assembly. `<FileVersion>` = `$(Version).0` cho đúng dạng bốn phần
+của Windows. Icon `Assets/ky-so.ico` (bút + nét ký, phong cách Fluent, 16–256 px) nhúng làm cả icon exe lẫn
+icon khay.
+
+⚠️ Không còn console nên lỗi lúc khởi động (cổng 17739 bị chiếm…) phải hiện bằng `MessageBox`; đừng bỏ khối
+`try` quanh `app.Start()` — thiếu nó là plugin chết im lặng.
 
 Trình cài đặt ghi lựa chọn của người dùng vào `HKCU\Software\KySoPlugin`; lúc khởi động plugin đọc lại giá
 trị `MoiTruong` ở đó làm `ASPNETCORE_ENVIRONMENT` (`ICauHinhCaiDat` ở `external/CauHinh`). Không có giá trị
@@ -72,13 +89,12 @@ thì kiểm CORS trước tiên.
 | POST | `api/plugin/chung-thu-so/kiem-tra-token` | Ký thử một mẩu dữ liệu để xác nhận token dùng được |
 | POST | `api/plugin/ky-so/mo-phien` | Mở khoá trên token và GIỮ handle cho cả lô; trả chứng thư phần công khai |
 | POST | `api/plugin/ky-so/ky` | Ký cả một đợt yêu cầu bằng handle đã mở, không hỏi PIN lại |
-| POST | `api/plugin/ky-so/do-toc-do` | Đo thời gian một lượt ký thật trên token |
 | POST | `api/plugin/ky-so/dong-phien` | Đóng phiên, giải phóng handle khoá |
 
 Ba điểm quan trọng về hành vi:
 
 - **Liệt kê chứng thư không bao giờ hỏi mã PIN.** Nó chỉ đọc metadata của khoá.
-- **Ba route chạm vào khoá bí mật thì bật hộp PIN**: `kiem-tra-token`, `ky-so/mo-phien` và `ky-so/do-toc-do`.
+- **Hai route chạm vào khoá bí mật thì bật hộp PIN**: `kiem-tra-token` và `ky-so/mo-phien`.
   Đó cũng là bằng chứng duy nhất rằng token đang cắm thật — mọi phép đọc metadata đều có thể "đạt hết" trong
   khi token đã rút từ lâu.
 - **Phiên bản trả ở `trang-thai` đọc từ assembly**, tức `<Version>` trong `ks.plugin.api.csproj` là nguồn
@@ -95,10 +111,20 @@ bằng khoá trên token, khoá phần mềm sao chép được nên không đ�
 Plugin đọc chứng thư qua **Windows certificate store** (`X509Store`), kể cả chứng thư nằm trên USB token.
 Plugin **không nạp thư viện PKCS#11 nào** và không gọi trực tiếp vào phần mềm của hãng token.
 
-Cầu nối là **middleware của hãng token** (bit4id với token của Ban Cơ yếu Chính phủ): nó đăng ký một provider
-mật mã với Windows, nhờ đó chứng thư trên token hiện ra trong certificate store như chứng thư thường.
+Cầu nối là **middleware của hãng token**: nó đăng ký một provider mật mã với Windows, nhờ đó chứng thư trên
+token hiện ra trong certificate store như chứng thư thường. Token của Ban Cơ yếu có hai đời, mỗi đời một
+middleware:
 
-Hệ quả: **máy chưa cài middleware thì plugin không thấy token**. Bộ cài vì thế phải kèm middleware.
+| Token | Middleware | Provider đăng ký |
+|---|---|---|
+| Đời mới | bit4id Universal MW | `Bit4id Universal Middleware Provider`, `Bit4id Key Storage Provider` |
+| Đời cũ, trước 2022 | TokenManager (cài VGCA Client 8.3 của SafeNet) | CSP `eToken Base Cryptographic Provider`, KSP `SafeNet Smart Card Key Storage Provider` |
+
+Token đời cũ đăng ký khoá qua **CSP của CAPI** chứ không phải KSP của CNG, nên .NET trả `RSACryptoServiceProvider`
+thay vì `RSACng`. `KeyProviders` (`external/Certificates`) đọc tên provider của cả hai kiểu; dò riêng `RSACng` là
+token cũ bị đánh là *khoá nằm trong kho phần mềm* dù đang cắm thật.
+
+Hệ quả: **máy chưa cài middleware thì plugin không thấy token**. Bộ cài vì thế kèm cả hai middleware.
 
 ## Đóng gói bộ cài
 
@@ -111,8 +137,9 @@ Script publish plugin self-contained, gọi `makensis` đóng `bo-cai.nsi` thàn
 `bo-cai/` của repo này và vào `Plugins/` của backend nào **thực sự có trong workspace** (không có thì bỏ qua,
 không tạo thư mục rỗng).
 
-Kết quả là **một file** `Ký số plugin.exe` (~102 MB): trình cài đặt NSIS mang sẵn plugin self-contained (máy
-người dùng không cần .NET runtime) và **bộ cài middleware** lấy từ `vendor/bit4id/`. Tên file giữ nguyên như
+Kết quả là **một file** `Ký số plugin.exe` (~162 MB): trình cài đặt NSIS mang sẵn plugin self-contained (máy
+người dùng không cần .NET runtime) và **hai bộ cài middleware** lấy từ `vendor/bit4id/` và
+`vendor/vgca-tokenmanager/`. Tên file giữ nguyên như
 bản cũ nên backend không phải sửa `SetupFileName`.
 
 Cần **NSIS 3** trên máy đóng gói; `dong-goi.ps1` tự tìm `makensis.exe` ở `Program Files` hoặc trên PATH và
@@ -127,7 +154,7 @@ Backend phát file này qua `api/core/plugin/bo-cai/noi-dung`. Sau khi đóng g�
 
 ### Đưa bộ cài lên máy chủ
 
-File exe **không nằm trong git** (~95 MB, là sản phẩm build), nên máy chủ dựng image từ bản clone của repo sẽ
+File exe **không nằm trong git** (~162 MB, là sản phẩm build), nên máy chủ dựng image từ bản clone của repo sẽ
 không có nó — thiếu bước này thì màn Ký số báo *"Máy chủ chưa có bộ cài plugin"*. Chép tay lên thư mục đã
 mount sẵn vào container:
 
@@ -142,17 +169,30 @@ không phải build lại image cũng không phải khởi động lại contain
 
 ### Middleware không nằm trong repo
 
-`vendor/bit4id/` là chỗ cắm sẵn cho file cài middleware, nhưng file đó là **phần mềm của hãng token**, phải
-lấy từ đơn vị cấp chứng thư số. Không có file thì vẫn đóng gói được, chỉ là bản ra không tự cài middleware
-và người dùng phải tự cài trước.
+`vendor/bit4id/` và `vendor/vgca-tokenmanager/` là chỗ cắm sẵn cho file cài middleware, nhưng file đó là
+**phần mềm của hãng token**, phải lấy từ đơn vị cấp chứng thư số. Thiếu file nào thì vẫn đóng gói được, chỉ là
+bản ra không tự cài middleware đó và người dùng phải tự cài trước. Cách lấy và mã băm từng bản: file `.md`
+trong mỗi thư mục.
 
-`dong-goi.ps1` tìm file `.exe`/`.msi` đầu tiên trong `vendor/bit4id/` rồi truyền đường dẫn vào `makensis` qua
-define `BO_CAI_MIDDLEWARE`. Lúc cài, NSIS bung file đó ra `$PLUGINSDIR` (thư mục tạm tự dọn) rồi chạy. Không
-có file thì define không được khai và bộ cài chỉ in một dòng nhắc người dùng tự cài middleware trước.
+`dong-goi.ps1` tìm file `.exe`/`.msi` đầu tiên trong mỗi thư mục rồi truyền đường dẫn vào `makensis` qua define
+`BIT4ID_SETUP` và `TOKEN_MANAGER_SETUP`, kèm đuôi file qua `*_SETUP_EXT`. Lúc cài, NSIS bung file ra
+`$PLUGINSDIR` (thư mục tạm tự dọn) **giữ nguyên đuôi** rồi chạy. Define nào không được khai thì bộ cài chỉ in
+một dòng nhắc người dùng tự cài middleware đó.
 
-Cờ chạy ngầm khai ở `CO_NGAM_MIDDLEWARE` trong `bo-cai.nsi`, mặc định `/S` vì bản bit4id đang dùng đóng bằng
-NSIS. Đổi sang bộ cài đóng bằng InstallShield hay Inno Setup thì phải sửa đúng cờ của loại đó — sai cờ là
-trình cài đứng im chờ một hộp thoại không ai nhìn thấy.
+Cách chạy ngầm chọn theo đuôi file (macro `RunVendorSetup` trong `bo-cai.nsi`):
+
+| Đuôi | Lệnh |
+|---|---|
+| `.msi` | `msiexec.exe /i "<file>" /qn /norestart` (`MSI_SILENT_FLAGS`) |
+| `.exe` | `<file> /S` (`SILENT_FLAG`) — cả bit4id lẫn TokenManager đang dùng đều đóng bằng NSIS |
+
+Bộ cài đóng bằng InstallShield hay Inno Setup thì ghi cờ đúng vào `vendor/<thư mục>/tham-so.txt` (dòng đầu không
+bắt đầu bằng `#`) — sai cờ là trình cài đứng im chờ một hộp thoại không ai nhìn thấy. `dong-goi.ps1` chuyển cờ
+sang NSIS qua một file include sinh tạm (`vendor-args.nsh` → define `*_SETUP_ARGS`), **không** qua dòng lệnh:
+PowerShell 5.1 làm rơi dấu nháy kép khi gọi chương trình ngoài, mà cờ InstallShield có dạng `/s /v"/qn"`.
+
+⚠️ Bản trước bung mọi file thành `*-setup.exe` rồi chạy kèm `/S`, nên một bộ cài `.msi` không bao giờ chạy được
+và người dùng chỉ thấy dòng *CHƯA cài được*. Đừng đổi lại thành tên cố định `.exe`.
 
 Không tự tải middleware từ Internet về. Đây là phần mềm đụng tới kho khoá mật mã của cả máy và được cài ngầm
 với quyền quản trị; tải một binary không rõ nguồn rồi làm vậy đúng là kịch bản một cuộc tấn công chuỗi cung
@@ -168,10 +208,10 @@ Toàn bộ việc cài nằm trong `bo-cai.nsi`. Người dùng bấm đúp mộ
 3. Chọn môi trường           -> Production / Staging / Development
 4. Tiến độ cài
    ├─ dừng bản plugin đang chạy (trừ chính trình cài đặt)
-   ├─ trình đọc token
-   │  ├─ máy đã có provider bit4id  -> bỏ qua
+   ├─ middleware token, lần lượt bit4id rồi TokenManager, mỗi cái xét riêng
+   │  ├─ máy đã có provider của nó  -> bỏ qua
    │  ├─ chưa có, bộ cài kèm sẵn    -> xin quyền quản trị, chạy ngầm, kiểm lại provider
-   │  └─ chưa có, không kèm         -> báo rõ rồi vẫn cài plugin (sẽ không thấy token)
+   │  └─ chưa có, không kèm         -> báo rõ rồi vẫn cài plugin (sẽ không thấy token đời đó)
    ├─ chép plugin vào thư mục đã chọn
    ├─ ghi HKCU\Software\KySoPlugin (ThuMucCai, MoiTruong)
    ├─ bật tự khởi động HKCU\...\Run
@@ -183,7 +223,9 @@ Gỡ bằng Apps & Features, hoặc chạy `go-cai-dat.exe` trong thư mục cà
 đặt, khoá cấu hình và file plugin.
 
 Cách nhận biết middleware đã có: hỏi thẳng danh sách provider mật mã đã đăng ký với Windows trong registry
-(`SetRegView 64` để đọc đúng nhánh 64-bit), không dò tên trong Programs and Features. Thứ quyết định token có
+(`SetRegView 64` để đọc đúng nhánh 64-bit): provider bắt đầu bằng `bit4id`/`bit4xpki` là có bit4id, bắt đầu bằng
+`eToken` là có TokenManager; không thấy thì dò thêm `System32\bit4*.dll` và `System32\eTOKCSP.dll`. Không dò
+tên trong Programs and Features. Thứ quyết định token có
 hiện trong certificate store là **provider có được đăng ký hay không**; mục trong Programs and Features chỉ
 nói ai đó từng chạy bộ cài, có bản gỡ lỗi để lại mục mà mất provider. Sau khi chạy bộ cài middleware, trình
 cài đặt **kiểm lại provider** thay vì tin vào mã thoát.
@@ -195,7 +237,11 @@ quản trị**; chỉ bước cài middleware mới nâng quyền qua `ExecShell
 ⚠️ Chọn thư mục cài nằm trong `Program Files` thì bước chép file sẽ thất bại vì bộ cài không chạy quyền quản
 trị. Mặc định để trong hồ sơ người dùng là có lý do.
 
-Gỡ plugin **không** gỡ middleware: đó là phần mềm dùng chung cho mọi ứng dụng chữ ký số trên máy.
+Gỡ plugin **không** gỡ middleware nào: đó là phần mềm dùng chung cho mọi ứng dụng chữ ký số trên máy.
+
+⚠️ Chưa chạy thử TokenManager với `/S` trên máy sạch: vỏ NSIS tắt được wizard của nó, nhưng chưa xác nhận bộ
+cài SafeNet bên trong cũng chạy ngầm. Bên trong còn bật cửa sổ thì bộ cài plugin đứng chờ — thử trước khi phát
+hành, xem [`vendor/vgca-tokenmanager/`](vendor/vgca-tokenmanager/DAT-BO-CAI-TOKENMANAGER-VAO-DAY.md).
 
 ## Chạy khi phát triển
 
@@ -250,9 +296,6 @@ plugin **tự gọi ra máy chủ qua WebSocket** để nhận việc, không m�
 gọi được plugin, hết chuyện mixed content, hết Private Network Access, hết xung đột cổng. Kế hoạch chi tiết
 nằm ở `.claude/plugin/plans/ky-so-plugin.plan.md`.
 
-**Giám sát rút token.** Phiên ký đã giữ handle khoá cho cả lô và tự đóng sau 15 phút không dùng, nhưng chưa
-đóng ngay khi rút token — rút giữa lô hiện biểu hiện thành một loạt file lỗi thay vì một thông báo rõ ràng.
-
 **Xác minh job ticket** do máy chủ ký, với public key ghim cứng lúc build, và tự tính lại giá trị băm từ
 bytes PDF thật trước khi ký.
 
@@ -260,6 +303,6 @@ bytes PDF thật trước khi ký.
 máy cơ quan thường bật chính sách không cho bỏ qua cảnh báo, và phần mềm diệt virus xem binary chưa ký chạy
 nền, tự khởi động, đụng crypto token, kết nối ra ngoài là chân dung mã độc điển hình.
 
-**Hộp PIN hiện chìm.** Plugin chạy nền không sở hữu cửa sổ nào nên hộp PIN có thể nằm sau trình duyệt. Hướng
-xử lý là cho plugin chạy dạng tray app có cửa sổ ẩn rồi truyền handle cửa sổ đó vào thuộc tính CNG
+**Hộp PIN hiện chìm.** Hộp PIN có thể nằm sau trình duyệt vì không gắn với cửa sổ nào. Plugin nay đã có cửa sổ
+trạng thái (ẩn khi chạy nền, luôn có handle); việc còn lại là truyền handle đó vào thuộc tính CNG
 `"HWND Handle"` trước khi ký.

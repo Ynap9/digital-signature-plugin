@@ -8,9 +8,8 @@ namespace ks.plugin.shared.Constants
         /// giữ, nên không để nó sống mãi chỉ vì người dùng quên đóng tab; lô đang chạy thì có lượt ký liên
         /// tục nên không bao giờ chạm mốc này.
         /// </summary>
-        public const int PhutTuDongDongPhien = 15;
+        public const int IdleTimeoutMinutes = 15;
 
-        /// <summary>Trần số lượt ký khi đo tốc độ: đo là chạm vào token thật, không để ai gọi thành vòng lặp vô tận.</summary>
-        public const int SoLanDoToiDa = 100;
+        public const int SessionCheckSeconds = 2;
     }
 }
